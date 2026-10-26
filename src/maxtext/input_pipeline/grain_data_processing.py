@@ -14,6 +14,7 @@
 
 """Input pipeline using Grain."""
 
+import dataclasses
 import math
 import glob
 import re
@@ -23,6 +24,7 @@ import functools
 import ml_collections
 from concurrent import futures
 import json
+import time
 
 import jax
 import numpy as np
@@ -99,6 +101,49 @@ def find_data_files(data_file_pattern, hf_access_token=None):
     raise FileNotFoundError(f"No files found matching pattern: {data_file_pattern}")
   max_logging.log(f"Found {len(data_files)} files for train/eval with grain")
   return data_files
+
+
+_NUM_THREADS_COUNTING_RECORDS = 64
+
+
+@dataclasses.dataclass(frozen=True)
+class _FileInstruction:
+  """Shard record range matching `grain.ArrayRecordDataSource`'s `FileInstruction` protocol."""
+
+  filename: str
+  skip: int
+  take: int
+  examples_in_shard: int
+
+
+@functools.lru_cache(maxsize=None)
+def _arrayrecord_file_instructions(pattern: str, hf_access_token: str | None = None) -> tuple[_FileInstruction, ...]:
+  """Lists ArrayRecord files matching `pattern` and counts their records once per process."""
+  start = time.time()
+  files = find_data_files(pattern, hf_access_token=hf_access_token)
+  with futures.ThreadPoolExecutor(max_workers=_NUM_THREADS_COUNTING_RECORDS) as executor:
+    num_records = list(executor.map(lambda file: len(grain.ArrayRecordDataSource(file)), files))
+  max_logging.log(
+      f"Counted {sum(num_records)} records across {len(files)} files matching {pattern} in {time.time() - start:.1f}s"
+  )
+  return tuple(_FileInstruction(file, 0, n, n) for file, n in zip(files, num_records))
+
+
+def _colocated_file_instructions(config, data_file_pattern, mixture_config_path=None):
+  """Pre-resolves ArrayRecord shard metadata on the controller for colocated Python input."""
+  if not config.colocated_python_data_input or config.grain_file_type != "arrayrecord":
+    return None
+  if mixture_config_path:
+    with open(mixture_config_path, "r", encoding="utf-8") as f:
+      patterns = [component["path"] for component in json.load(f).values()]
+  elif data_file_pattern:
+    patterns = (
+        [c.split(",")[0] for c in data_file_pattern.split(";")] if ";" in data_file_pattern else [data_file_pattern]
+    )
+  else:
+    return None
+  hf_access_token = getattr(config, "hf_access_token", None)
+  return {pattern: _arrayrecord_file_instructions(pattern, hf_access_token) for pattern in patterns}
 
 
 def _apply_mapdataset_transforms(
@@ -178,12 +223,17 @@ def get_datasets(
     dataset_config=None,
     split="train",
     grain_index_storage_option=None,
+    file_instructions=None,
 ):
   """Load a Grain dataset for the selected ``grain_file_type``."""
   if data_file_type == "arrayrecord":
     # Helper function to find files, create data source, and wrap in MapDataset
     def create_dataset_from_pattern(pattern):
-      files = find_data_files(pattern, hf_access_token=hf_access_token)
+      files = (
+          file_instructions[pattern]
+          if file_instructions and pattern in file_instructions
+          else find_data_files(pattern, hf_access_token=hf_access_token)
+      )
       reader_options = (
           {"index_storage_option": grain_index_storage_option} if grain_index_storage_option is not None else None
       )
@@ -891,6 +941,7 @@ def make_grain_train_iterator(
       hf_access_token=getattr(config, "hf_access_token", None),
       dataset_config=dataset_config,
       split="train",
+      file_instructions=_colocated_file_instructions(config, grain_train_files, config.grain_train_mixture_config_path),
   )
 
   preprocessing_fn_kwargs = {
@@ -1037,6 +1088,7 @@ def make_grain_eval_iterator(
       hf_access_token=getattr(config, "hf_access_token", None),
       dataset_config=dataset_config,
       split="eval",
+      file_instructions=_colocated_file_instructions(config, grain_eval_files),
   )
 
   eval_preprocessing_fn_kwargs = {

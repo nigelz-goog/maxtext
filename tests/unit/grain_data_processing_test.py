@@ -16,6 +16,7 @@
 
 import functools
 import os
+import pickle
 import subprocess
 import sys
 import tempfile
@@ -416,6 +417,97 @@ class TestGrainArrayRecordDataSource:
       )
 
     data_source.assert_called_once_with(["data.arrayrecord"], reader_options=expected_reader_options)
+
+
+class ArrayRecordFileInstructionsTest(unittest.TestCase):
+  """Tests controller-side ArrayRecord metadata resolution for colocated Python input."""
+
+  # pylint: disable=protected-access
+
+  def setUp(self):
+    super().setUp()
+    grain_data_processing._arrayrecord_file_instructions.cache_clear()
+    self.addCleanup(grain_data_processing._arrayrecord_file_instructions.cache_clear)
+
+  def test_datasource_uses_file_instructions_without_opening_files(self):
+    instructions = [
+        grain_data_processing._FileInstruction("/no/such/file-0", 0, 3, 3),
+        grain_data_processing._FileInstruction("/no/such/file-1", 0, 5, 5),
+    ]
+    self.assertEqual(len(grain.ArrayRecordDataSource(instructions)), 8)
+
+  def test_caches_counts_per_pattern_and_matches_direct_read(self):
+    pattern = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "assets/local_datasets/c4_en_dataset_minimal/c4/en/3.0.1/c4-train.array_record-0000[01]-of-00008",
+    )
+    with mock.patch.object(
+        grain_data_processing, "find_data_files", wraps=grain_data_processing.find_data_files
+    ) as find_files:
+      first = grain_data_processing._arrayrecord_file_instructions(pattern)
+      second = grain_data_processing._arrayrecord_file_instructions(pattern)
+
+    self.assertIs(second, first)
+    find_files.assert_called_once_with(pattern, hf_access_token=None)
+    direct = grain.ArrayRecordDataSource(grain_data_processing.find_data_files(pattern))
+    from_instructions = grain.ArrayRecordDataSource(pickle.loads(pickle.dumps(first)))
+    self.assertEqual(len(from_instructions), len(direct))
+    self.assertEqual(from_instructions[0], direct[0])
+    self.assertEqual(from_instructions[len(direct) - 1], direct[len(direct) - 1])
+
+  def test_get_datasets_uses_file_instructions_without_listing_files(self):
+    config = SimpleNamespace(colocated_python_data_input=True, grain_file_type="arrayrecord")
+    with (
+        mock.patch.object(
+            grain_data_processing, "find_data_files", side_effect=lambda p, hf_access_token=None: [f"{p}0"]
+        ),
+        mock.patch.object(grain_data_processing.grain, "ArrayRecordDataSource", return_value=[None] * 4),
+    ):
+      file_instructions = grain_data_processing._colocated_file_instructions(config, "a,0.3;b,0.7")
+
+    with (
+        mock.patch.object(grain_data_processing, "find_data_files", side_effect=AssertionError("Unexpected glob")),
+        mock.patch.object(grain_data_processing.grain, "ArrayRecordDataSource") as data_source,
+        mock.patch.object(grain_data_processing.grain.MapDataset, "source"),
+        mock.patch.object(grain_data_processing.grain.IterDataset, "mix"),
+    ):
+      grain_data_processing.get_datasets(
+          "a,0.3;b,0.7",
+          "arrayrecord",
+          shuffle=False,
+          shuffle_seed=0,
+          shuffle_buffer_size=1,
+          num_epoch=1,
+          dataloading_host_index=0,
+          dataloading_host_count=1,
+          grain_worker_count=0,
+          grain_num_threads=1,
+          grain_prefetch_buffer_size=1,
+          grain_data_source_max_workers=1,
+          file_instructions=file_instructions,
+      )
+
+    data_source.assert_has_calls(
+        [mock.call(file_instructions["a"], reader_options=None), mock.call(file_instructions["b"], reader_options=None)],
+        any_order=True,
+    )
+
+  def test_colocated_file_instructions_guards_and_mixtures(self):
+    def cfg(**overrides):
+      return SimpleNamespace(colocated_python_data_input=True, grain_file_type="arrayrecord", **overrides)
+
+    resolve = grain_data_processing._colocated_file_instructions
+    with mock.patch.object(grain_data_processing, "_arrayrecord_file_instructions", side_effect=lambda p, *_: (p,)):
+      self.assertIsNone(resolve(cfg(colocated_python_data_input=False), "a"))
+      self.assertIsNone(resolve(cfg(grain_file_type="parquet"), "a"))
+      self.assertIsNone(resolve(cfg(), ""))
+      self.assertEqual(resolve(cfg(), "a"), {"a": ("a",)})
+      self.assertEqual(resolve(cfg(), "a,0.3;b,0.7"), {"a": ("a",), "b": ("b",)})
+      with tempfile.TemporaryDirectory() as directory:
+        mixture_config_path = os.path.join(directory, "mixture.json")
+        with open(mixture_config_path, "w", encoding="utf-8") as f:
+          json.dump({"x": {"path": "c", "weight": 1}, "y": {"path": "d", "weight": 2}}, f)
+        self.assertEqual(resolve(cfg(), "", mixture_config_path), {"c": ("c",), "d": ("d",)})
 
 
 class GrainArrayRecordProcessingTest(
