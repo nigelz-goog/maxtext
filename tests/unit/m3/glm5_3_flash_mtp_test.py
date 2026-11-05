@@ -356,6 +356,7 @@ class Glm5MtpTest(parameterized.TestCase):
       ("fp32_e3", False),
       ("fp64_strict", True),
   )
+  @pytest.mark.integration_test
   def test_forward_and_backward_all_param_parity(self, is_fp64: bool):
     """Test 1: Forward + all-parameter backward parity vs PyTorch reference."""
     dt_str = "float64" if is_fp64 else "float32"
@@ -467,6 +468,7 @@ class Glm5MtpTest(parameterized.TestCase):
         else:
           glm5_test_utils._assert_e3(v_jax, v_hf, name=p_str, is_fp64=is_fp64)
 
+  @pytest.mark.integration_test
   def test_eh_proj_concatenation_order_negative_test(self):
     """Test 2: Swapping [enorm(E); hnorm(h)] -> [hnorm(h); enorm(E)] produces large mismatch (> 1e-2)."""
     cfg, _ = _make_cfg(num_hidden_layers=5, num_nextn_predict_layers=1)
@@ -701,6 +703,7 @@ class Glm5MtpTest(parameterized.TestCase):
     with self.assertRaises(TypeError):
       modeling_glm5_3_flash.Glm5DsaMlaAttention(cfg, layer_idx=0, rngs=nnx.Rngs(0))  # pylint: disable=missing-kwoa
 
+  @pytest.mark.integration_test
   def test_mtp_training_gate(self):
     """Test 5: 10 @nnx.jit training steps with MTP loss, verifying loss decrease and frozen params."""
     cfg, _ = _make_cfg(num_hidden_layers=5, num_nextn_predict_layers=1, scan_layers=False)
@@ -835,6 +838,7 @@ class Glm5MtpTest(parameterized.TestCase):
           f"Router bias drifted during training: {k}",
       )
 
+  @pytest.mark.integration_test
   def test_mtp_sharding_fsdp_mesh(self):
     """Test 6: Verifies Glm5Mtp creates and runs on FSDP mesh without duplicate axis error."""
     devices = np.array(jax.devices()[:1]).reshape((1, 1, 1, 1))
@@ -863,6 +867,7 @@ class Glm5MtpTest(parameterized.TestCase):
       )
       self.assertEqual(mtp_logits.shape, (1, 8, cfg.vocab_size))
 
+  @pytest.mark.integration_test
   def test_mtp_vocab_tiling_loss_and_gradient_parity(self):
     """Verifies num_vocab_tiling=1 and 2 produce identical MTP loss, gradients, and engine integration (P2-56)."""
     cfg, _ = _make_cfg(num_hidden_layers=5, num_nextn_predict_layers=1, scan_layers=False)

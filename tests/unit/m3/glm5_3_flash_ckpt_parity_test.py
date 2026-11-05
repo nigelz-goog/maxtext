@@ -403,6 +403,7 @@ class Glm5CkptParityTest(parameterized.TestCase):
       ("seq4096_5layers_unscanned_left", 4096, 5, False, "left"),
       ("seq4096_13layers_scanned_left", 4096, 13, True, "left"),
   )
+  @pytest.mark.integration_test
   def test_masked_prefill_parity_and_tier_1ab(
       self,
       seq_len: int,
@@ -529,6 +530,7 @@ class Glm5CkptParityTest(parameterized.TestCase):
       (13, True, "right"),
       (13, True, "left"),
   )
+  @pytest.mark.integration_test
   def test_batch_determinism(self, num_layers: int, scan_layers: bool, padding_side: str):
     """Verifies single-sample vs batched forward pass agreement under left/right-padding."""
     jax_m, _, _, _ = self._prepare_model_and_hf_state(num_layers, scan_layers)
@@ -562,6 +564,7 @@ class Glm5CkptParityTest(parameterized.TestCase):
       )
 
   @parameterized.parameters((5, False), (13, True))
+  @pytest.mark.integration_test
   def test_debug_stats_verification(self, num_layers: int, scan_layers: bool):
     """Verifies Appendix B first/last-block stats match HF, and omit debug_stats when disabled."""
     jax_m, hf_m, _, _ = self._prepare_model_and_hf_state(num_layers, scan_layers, enable_debug_stats=False)
@@ -724,6 +727,7 @@ class Glm5CkptParityTest(parameterized.TestCase):
       self.assertEmpty(dict(nnx.state(jax_grads, modeling_glm5_3_flash.Glm5RouterBias)))
 
   @parameterized.parameters((5, False), (13, True))
+  @pytest.mark.integration_test
   def test_golden_batch_ce_loss_and_all_param_gradient_parity(self, num_layers: int, scan_layers: bool):
     """Verifies golden-batch masked CE loss and all-param gradients match HF under fp32 and fp64."""
     self._run_ce_and_grad_parity(num_layers, scan_layers, is_fp64=False)

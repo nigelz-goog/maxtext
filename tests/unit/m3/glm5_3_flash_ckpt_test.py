@@ -735,6 +735,7 @@ class Glm5CkptTest(parameterized.TestCase):
       )
 
   @parameterized.parameters((5, False), (13, True))
+  @pytest.mark.integration_test
   def test_load_hf_state_into_model_parity(self, num_layers, scan_layers):
     """Verifies load_hf_state_into_model with FP8 scales, per-expert keys, and bias restoration."""
     c, hf_c = _make_cfg(num_hidden_layers=num_layers, scan_layers=scan_layers)
@@ -809,6 +810,7 @@ class Glm5CkptTest(parameterized.TestCase):
       self._assert_e3(gj, gh, "param_grad")
     self.assertEmpty(dict(nnx.state(grads, modeling_glm5_3_flash.Glm5RouterBias)))
 
+  @pytest.mark.integration_test
   def test_fp64_ckpt_load_parity(self):
     """Verifies fp64 checkpoint loading forward logits and gradient parity at <= 1e-10."""
     c, hf_c = _make_cfg(
@@ -1488,6 +1490,7 @@ class Glm5CkptTest(parameterized.TestCase):
         with self.assertRaisesRegex(ValueError, "does not match model variable dtype"):
           glm5_ckpt.restore_orbax_checkpoint(m_fp32, obx_dir, mesh=None)
 
+  @pytest.mark.integration_test
   def test_streaming_bit_identical_to_oracle_and_hf_source(self):
     """Verifies streaming bit-identity to source HF tensors against the in-memory reference oracle."""
     with _fp64_mode(), tempfile.TemporaryDirectory() as hf_dir, tempfile.TemporaryDirectory() as tmp_dir:
@@ -1588,6 +1591,7 @@ class Glm5CkptTest(parameterized.TestCase):
       ("float64_scanned", "float64", torch.float64 if HAS_TORCH else None, 2048, True),
       ("bfloat16_unscanned", "bfloat16", torch.bfloat16 if HAS_TORCH else None, 2048, False),
   )
+  @pytest.mark.integration_test
   def test_streaming_peak_memory_bound_and_positive_control(
       self,
       target_dtype: str,
@@ -1824,6 +1828,7 @@ class Glm5CkptTest(parameterized.TestCase):
       self.assertGreater(peak_preload, expected_bound)
 
   @parameterized.parameters(False, True)
+  @pytest.mark.integration_test
   def test_streaming_zarr_zstd_compressor_and_chunk_metadata(self, scan_layers: bool):
     """Verifies Zarr zstd compressor and chunking metadata across scanned and unscanned modes."""
     with tempfile.TemporaryDirectory() as hf_dir, tempfile.TemporaryDirectory() as tmp_dir:
@@ -2093,6 +2098,7 @@ class Glm5CkptTest(parameterized.TestCase):
           ref_ckpt_meta["item_handlers"],
       )
 
+  @pytest.mark.integration_test
   def test_streaming_error_branches(self):
     """Verifies streaming conversion error branches for discovery, MTP, and key mapping."""
     c = _make_cfg(7, scan_layers=False)[0]
@@ -2419,6 +2425,7 @@ class Glm5CkptTest(parameterized.TestCase):
               max_inflight_bytes=64 * 1024 * 1024,
           )
 
+  @pytest.mark.integration_test
   def test_assign_b_idx_bounds_raises(self):
     """Verifies that _assign bounds checks work and kwargs are required."""
     c, _ = _make_cfg(num_hidden_layers=7, scan_layers=True)
@@ -2518,6 +2525,7 @@ class Glm5CkptTest(parameterized.TestCase):
         "requires a non-None stack_index",
     )
 
+  @pytest.mark.integration_test
   def test_restore_orbax_checkpoint_sharded(self):
     """Verifies restoring an Orbax checkpoint with different sharding branch configurations."""
     if len(jax.devices()) < 4 and "TEST_SRCDIR" not in os.environ:
@@ -2958,6 +2966,7 @@ class Glm5CkptTest(parameterized.TestCase):
       with self.assertRaisesRegex(ValueError, "config_json must contain a non-empty JSON object"):
         _run(argv)
 
+  @pytest.mark.integration_test
   def test_cli_end_to_end_synthetic_conversion(self):
     """End-to-end synthetic conversion tests."""
     c, _ = _make_cfg(
@@ -3045,6 +3054,7 @@ class Glm5CkptTest(parameterized.TestCase):
         for (_, g), (_, r) in zip(flat_m, flat_ref, strict=True):
           np.testing.assert_array_equal(g, r)
 
+  @pytest.mark.integration_test
   def test_cli_end_to_end_sliced_conversion(self):
     """End-to-end sliced conversion tests."""
     c, _ = _make_cfg(
@@ -3120,6 +3130,7 @@ class Glm5CkptTest(parameterized.TestCase):
       for g, r in zip(leaves_m, leaves_ref, strict=True):
         np.testing.assert_array_equal(g, r)
 
+  @pytest.mark.integration_test
   def test_cli_standalone_entrypoint_subprocess(self):
     c, _ = _make_cfg(
         num_hidden_layers=4,
@@ -3216,6 +3227,7 @@ class Glm5CkptTest(parameterized.TestCase):
       ("float32_scanned", "float32", True),
       ("bfloat16_unscanned", "bfloat16", False),
   )
+  @pytest.mark.integration_test
   def test_streaming_peak_memory_bound_parallel(self, target_dtype: str, scan_layers: bool):
     """Verifies parallel peak memory bounds and concurrent shard LRU limits."""
     c = dataclasses.replace(

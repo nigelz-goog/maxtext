@@ -177,6 +177,7 @@ class Glm5DsaMlaTest(parameterized.TestCase):
       ("dense_seq10_left_padded", 10, 16, "left"),
       ("sparse_seq22_left_padded", 22, 8, "left"),
   )
+  @pytest.mark.integration_test
   def test_dsa_mla_forward_backward_parity(
       self,
       seq_len: int,
@@ -481,6 +482,7 @@ class Glm5DsaMlaTest(parameterized.TestCase):
     with self.assertRaisesRegex(ValueError, "packing=True"):
       self._mini_cfg(packing=True)
 
+  @pytest.mark.integration_test
   def test_bfloat16_mixed_precision(self):
     """Verifies bfloat16 mixed precision execution, indexer int32 mask, and float32 gradients."""
     cfg = self._mini_cfg(dtype="bfloat16", weight_dtype="float32", index_topk=4)

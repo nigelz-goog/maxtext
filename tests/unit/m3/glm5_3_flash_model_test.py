@@ -360,6 +360,7 @@ class Glm5ModelTest(parameterized.TestCase):
       ("layers13_fp64", 13, True),
       ("layers13_fp32", 13, False),
   )
+  @pytest.mark.integration_test
   def test_hf_parity_and_backward(self, num_layers, is_fp64):
     """Verifies forward and backward parity between HF and JAX Glm5Model."""
     cfg_f32, hf_c = _make_cfg(
@@ -436,6 +437,7 @@ class Glm5ModelTest(parameterized.TestCase):
       ("unscanned", "unscanned"),
       ("remat", "remat"),
   )
+  @pytest.mark.integration_test
   def test_scanned_unscanned_and_remat_parity(self, variant):
     """Verifies bit-level forward and per-param gradient parity on 13-layer model."""
     cfg_s, _ = _make_cfg(num_hidden_layers=13, scan_layers=True)
@@ -485,6 +487,7 @@ class Glm5ModelTest(parameterized.TestCase):
     for ps, pm in zip(leaves_s, leaves_m, strict=True):
       self._assert_allclose(ps, pm, atol=1e-5, rtol=1e-5)
 
+  @pytest.mark.integration_test
   def test_right_padded_parity(self):
     """Verifies parity on right-padded sequences using decoder_segment_ids."""
     num_layers = 5
@@ -556,6 +559,7 @@ class Glm5ModelTest(parameterized.TestCase):
     )
     self.assertGreater(float(out_aux.aux["moe_lb_loss"]), 0.0)
 
+  @pytest.mark.integration_test
   def test_moe_lb_loss_parity_against_hf(self):
     """Verifies moe_lb_loss matches HF load_balancing_loss_func.
 
@@ -632,6 +636,7 @@ class Glm5ModelPureJaxTest(parameterized.TestCase):
   def _assert_allclose(self, a, b, atol=1e-4, rtol=1e-4):
     np.testing.assert_allclose(np.array(a), np.array(b), atol=atol, rtol=rtol)
 
+  @pytest.mark.integration_test
   def test_registry_dispatch_and_invariants(self):
     """Verifies registry dispatch, debug stats generation, and factory validation."""
     self.assertIs(
@@ -734,6 +739,7 @@ class Glm5ModelPureJaxTest(parameterized.TestCase):
     with self.assertRaises(TypeError):
       modeling_glm5_3_flash.create_glm5_3_flash_model(cfg, rngs=nnx.Rngs(0), place_on_devices=False)
 
+  @pytest.mark.integration_test
   def test_bfloat16_precision(self):
     """Verifies model execution with dtype=bfloat16 and weight_dtype=float32 on 13-layer model."""
     cfg, _ = _make_cfg(
@@ -774,6 +780,7 @@ class Glm5ModelPureJaxTest(parameterized.TestCase):
     for g in leaves:
       self.assertTrue(bool(jnp.all(jnp.isfinite(g))))
 
+  @pytest.mark.integration_test
   def test_model_on_single_device_mesh(self):
     """Verifies Glm5Model instantiation and execution on 1-device MaxText mesh."""
     devices = np.array(jax.devices()[:1]).reshape((1, 1, 1, 1))
@@ -1015,6 +1022,7 @@ class Glm5ModelPureJaxTest(parameterized.TestCase):
       for idx in [0, 1, 2, 3, 5, 7, 9]:
         self.assertNotIn("selected_block_indices", aux["layer_aux"][idx])
 
+  @pytest.mark.integration_test
   def test_unstacked_per_layer_reference_parity_seq_len_gt_index_topk(self):
     tokens = jnp.array(np.random.RandomState(42).randint(0, 64, size=(1, 32)))
 

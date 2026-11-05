@@ -75,6 +75,7 @@ class Glm5ScanTest(parameterized.TestCase):
   def _assert_allclose(self, a, b, atol=1e-5, rtol=1e-5):
     np.testing.assert_allclose(np.array(a), np.array(b), atol=atol, rtol=rtol)
 
+  @pytest.mark.integration_test
   def test_scanned_unscanned_and_remat_parity(self):
     """Verifies forward/backward parity with distinct per-block router bias across scan/remat modes."""
     cfg = self.cfg
@@ -330,6 +331,7 @@ class Glm5ScanTest(parameterized.TestCase):
     bias = sb.slot_0.mlp.gate.e_score_correction_bias
     self.assertEqual(bias.out_sharding, jax.sharding.PartitionSpec(None, None))
 
+  @pytest.mark.integration_test
   def test_return_aux_scanned_unscanned_parity(self):
     """F49 Invariant: Parity for scanned vs unscanned return_aux execution."""
     cfg = self.cfg
@@ -474,6 +476,7 @@ class Glm5ScanTest(parameterized.TestCase):
     self.assertGreater(len(np.unique(np.array(rt_s[0]))), 2)
     self.assertFalse(np.allclose(np.array(rw_s[0]), 1.0 / cfg.n_routed_experts))
 
+  @pytest.mark.integration_test
   def test_path_transparency_and_sharding(self):
     """Verifies parameter path transparency and outer-axis replication in sharding."""
     cfg = self.cfg
@@ -545,6 +548,7 @@ class Glm5ScanTest(parameterized.TestCase):
           return_aux=False,
       )
 
+  @pytest.mark.integration_test
   def test_scan_super_blocks_enable_debug_stats(self):
     """Verifies scan_super_blocks with enable_debug_stats=True returns non-None all_idx."""
     cfg = dataclasses.replace(self.cfg, enable_debug_stats=True)

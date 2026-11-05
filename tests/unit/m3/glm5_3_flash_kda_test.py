@@ -530,6 +530,7 @@ class Glm5KdaAttentionTest(parameterized.TestCase):
     self.assertGreater(float(jnp.max(jnp.abs(grads.dt_bias[...]))), 1e-4)
     self.assertGreater(float(jnp.max(jnp.abs(grads.o_norm.weight[...]))), 1e-4)
 
+  @pytest.mark.integration_test
   def test_kda_attention_xla_chunked_vs_xla(self):
     """Verifies parity between xla_chunked and xla backends at seq_len=192 (multi-chunk)."""
     # Parity contract tolerances per tokamax/_src/ops/kda/xla_chunked_test.py:102,222
@@ -580,6 +581,7 @@ class Glm5KdaAttentionTest(parameterized.TestCase):
     self.assertTrue(np.all((a_log_np >= 0.0) & (a_log_np <= math.log(16.0))))
     self.assertTrue(np.any(a_log_np > 0.0))
 
+  @pytest.mark.integration_test
   def test_right_padding_mask_invariance(self):
     """Verifies trailing right-padded tokens do not affect valid tokens."""
     jax_layer = Glm5KdaAttention(self._mini_cfg(), rngs=nnx.Rngs(0))
@@ -667,6 +669,7 @@ class Glm5KdaAttentionTest(parameterized.TestCase):
     _sharded(layer.o_norm.weight, P(None))
     _sharded(layer.o_proj.kernel, P("tensor", "fsdp"))
 
+  @pytest.mark.integration_test
   def test_kda_multi_device_sharding_parity(self):
     """Verifies numerical parity between sharded and unsharded Glm5KdaAttention forward and backward."""
     if len(jax.devices()) < 4:

@@ -229,6 +229,7 @@ class Glm5MhcTest(parameterized.TestCase):
       ("L3_mla_moe", 3),
       ("L4_kda_moe", 4),
   )
+  @pytest.mark.integration_test
   def test_decoder_layer_permutations(self, layer_idx: int):
     """Verifies parity across all 3 block permutations: L0, L3, L4."""
     hf_l = hf_model.Glm5NextTextDecoderLayer(self.hf_cfg, layer_idx=layer_idx).to(torch.float32)

@@ -140,6 +140,7 @@ class Glm5TrainTest(absltest.TestCase):
     finally:
       sys.modules.update(saved_modules)
 
+  @pytest.mark.integration_test
   def test_f23_remat_policy_mapping(self):
     """Verifies F23 remat_policy mapping to JAX checkpoint policies and loud rejection."""
     cfg_none = _make_train_cfg(num_hidden_layers=5, scan_layers=False, remat_policy="none")
@@ -181,6 +182,7 @@ class Glm5TrainTest(absltest.TestCase):
       with self.assertRaises(ValueError):
         modeling_glm5_3_flash.create_glm5_3_flash_model(bad_cfg, rngs=nnx.Rngs(0))
 
+  @pytest.mark.integration_test
   def test_remat_gradient_equality(self):
     """Verifies all-leaf parameter gradients match between remat_policy='full' and 'none' (P2-53)."""
     orig_prec = jax.config.jax_default_matmul_precision
@@ -257,6 +259,7 @@ class Glm5TrainTest(absltest.TestCase):
     finally:
       jax.config.update("jax_default_matmul_precision", orig_prec)
 
+  @pytest.mark.integration_test
   def test_compute_glm5_loss_and_validation(self):
     """Verifies Row 89 contract, Row 92 shape & entry validation, and loss calculation."""
     cfg = _make_train_cfg(num_hidden_layers=5, scan_layers=False, remat_policy="none")
@@ -392,6 +395,7 @@ class Glm5TrainTest(absltest.TestCase):
     self.assertEqual(float(engine_loss), float(total_loss))
     self.assertEqual(float(engine_aux["ce_loss"]), float(aux["ce_loss"]))
 
+  @pytest.mark.integration_test
   def test_bfloat16_loss_and_metrics_are_float32(self):
     """Row 91: Verifies bfloat16 model produces float32 scalars for loss, ce_loss, and moe_lb_loss."""
     cfg_bf16 = _make_train_cfg(
@@ -421,6 +425,7 @@ class Glm5TrainTest(absltest.TestCase):
     self.assertTrue(jnp.isfinite(aux["ce_loss"]))
     self.assertTrue(jnp.isfinite(aux["moe_lb_loss"]))
 
+  @pytest.mark.integration_test
   def test_optax_masked_weight_decay_invariance(self):
     """Row 90: Verifies weight_decay=0.1 does not decay router bias or indexer parameters."""
     cfg = _make_train_cfg(num_hidden_layers=7, scan_layers=True, remat_policy="none")
@@ -506,6 +511,7 @@ class Glm5TrainTest(absltest.TestCase):
     glm5_config.validate_no_packing(np.array([[1, 1, 1, 1]]))
     glm5_config.validate_no_packing(np.array([[0, 0, 1, 1]]))
 
+  @pytest.mark.integration_test
   def test_phase2_multi_step_training_and_frozen_params(self):
     """Phase 2: 10 training steps on 7L model verifying loss decrease and active expert training."""
     cfg = _make_train_cfg(num_hidden_layers=7, scan_layers=True, remat_policy="none")
@@ -574,6 +580,7 @@ class Glm5TrainTest(absltest.TestCase):
         f"Loss did not decrease: initial={losses[0]}, final={losses[-1]}",
     )
 
+  @pytest.mark.integration_test
   def test_multi_step_loss_decrease_with_scan_and_sharded_mesh(self):
     """Row 94: Verifies 5-step loss decrease with scan_layers=True and remat under Glm5Sharding mesh."""
     devices = np.array(jax.devices()[:1]).reshape((1, 1, 1, 1))
@@ -613,6 +620,7 @@ class Glm5TrainTest(absltest.TestCase):
         f"5-step training with scan+remat did not decrease loss: {losses[0]} ->" f" {losses[-1]}",
     )
 
+  @pytest.mark.integration_test
   def test_phase3_train_ce_decrease_and_disjoint_eval_finiteness(self):
     """Verifies training cross-entropy decreases while evaluation on disjoint token IDs stays finite and reflects
 
@@ -680,6 +688,7 @@ class Glm5TrainTest(absltest.TestCase):
     self.assertNotEqual(post_ce, pre_ce)
     self.assertNotEqual(post_prob, pre_prob)
 
+  @pytest.mark.integration_test
   def test_vocab_tiling_loss_and_gradient_parity(self):
     """Verifies num_vocab_tiling=1, 2, and 4 produce exact loss and gradient parity."""
     cfg = _make_train_cfg(num_hidden_layers=5, scan_layers=False, remat_policy="none")

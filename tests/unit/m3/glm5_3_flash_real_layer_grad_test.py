@@ -952,6 +952,7 @@ class Glm5RealLayerGradHermeticTest(parameterized.TestCase):
       ("l4_kda_moe_fp32", "l4_kda_moe", False),
       ("l4_kda_moe_fp64", "l4_kda_moe", True),
   )
+  @pytest.mark.integration_test
   def test_hermetic_layer_grad_parity(self, case: str, is_fp64: bool):
     if _RUN_REAL_LAYER_GRAD.value:
       self.skipTest("Skipping hermetic test when --run_real_layer_grad=true.")
